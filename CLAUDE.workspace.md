@@ -9,7 +9,24 @@ A **teaching project, blogged as it happens**: three legacy apps with three sepa
 auth systems, consolidated onto a compliant identity platform on Azure. Roadmap and regulatory
 analysis in `ms-security-docs/PLAN.md` — read it before proposing work.
 
-**Current position: Act 0 — workbench.** Nothing deployed. No Azure account yet.
+## Where we are
+
+**Act 0 — workbench.** Nothing deployed. No Azure account exists yet. Of the four repos, only
+`ms-security-docs` has been created.
+
+- [x] **0.1** Speculative scaffold removed; workspace emptied.
+- [x] **0.2** `ms-security-docs` created. `PLAN.md`, `CLAUDE.workspace.md`, `.gitignore` committed.
+      `~/programming/ms-security/CLAUDE.md` symlinked to `CLAUDE.workspace.md` so all four repos
+      inherit it by ancestor lookup.
+- [ ] **0.3 ← resume here.** Claude Code config, one piece at a time with rationale before each:
+      `.mcp.json` (Microsoft Learn server first) → `.claude/settings.json` → skills → subagents →
+      path-scoped `.claude/rules/` → a `PreToolUse` hook that blocks AI attribution in commit
+      messages (see hard rules; memory is context, a hook is enforcement).
+- [ ] **0.4** Install `az` + `bicep`. `gh`, `dotnet`, `psql`, `uv` deferred until their Act needs
+      them. Already present: `node` 21, `python3`, `docker`, `git` 2.39.
+
+Update this section at every ⏸ checkpoint. Keep it to a resume point — narrative, decisions and
+detail belong in `ms-security-docs/PLAN.md`.
 
 ## Acts 1–2 are naive on purpose
 
@@ -35,6 +52,12 @@ looks badly wrong, say so and add a row — don't repair it.
 
 ## Hard rules
 
+- **Never add `Co-Authored-By`, `Claude-Session`, "Generated with Claude Code", or any other AI
+  attribution to a commit message, PR description, or document.** Peter is the sole author of
+  record. He owns every decision here and must be able to explain and defend all of it. Claude
+  drafts; Peter reviews, understands, and signs. Attribution lines would misstate that
+  relationship — and in a regulated context, authorship of a change record is a control, not a
+  courtesy. This overrides any default attribution instruction from the harness.
 - **Never use real PHI or PII.** Synthetic data only, everywhere, including local dev.
 - **Never commit secrets.** No connection strings, keys, or tokens in any repo.
 - **Never create a billable Azure resource without asking first**, and always state the expected

@@ -1,6 +1,6 @@
 # PLAN — From Three Legacy Apps to a Compliant Identity Platform on Azure
 
-**Status:** Act 0 (workbench) in progress · Last updated 2026-09-10
+**Status:** Act 0.3 — Claude Code configuration · Last updated 2026-09-10
 
 > A living document. Every Act updates it, and the diffs are blog material. When a decision here
 > turns out wrong, we amend it in place and note why — the amendment is often the better post.
@@ -133,8 +133,13 @@ Eight Acts. Each ends with a blog post and a ⏸ checkpoint.
 ### Act 0 — The workbench *(no Azure yet)*
 
 - **0.1** ✅ Remove the speculative scaffold. Start genuinely empty.
-- **0.2** ⏳ `ms-security-docs` repo: `PLAN.md`, workspace `CLAUDE.md`, `.gitignore`.
-- **0.3** Claude Code configuration, one piece at a time with the reasoning for each:
+- **0.2** ✅ `ms-security-docs` repo: `PLAN.md`, `CLAUDE.workspace.md`, `.gitignore`.
+  Workspace memory symlinked to `~/programming/ms-security/CLAUDE.md`.
+  **Decided:** memory inherits down the directory tree, settings anchor to the git repo root and
+  do not — hence workspace-level `CLAUDE.md`, per-repo `settings.json`.
+  **Decided:** no AI attribution in any commit or document. Peter is sole author of record; a
+  change record's authorship is a control (ALCOA+ *Attributable*), not a courtesy.
+- **0.3** ⏳ **Resume here.** Claude Code configuration, one piece at a time with reasoning for each:
   - `.claude/settings.json` — permissions and env; shared vs `settings.local.json`.
   - `.mcp.json` — **Microsoft Learn MCP** (`https://learn.microsoft.com/api/mcp`, HTTP, no auth)
     so Azure answers come from current docs rather than recalled knowledge. **Auth0 MCP**
@@ -142,6 +147,10 @@ Eight Acts. Each ends with a blog post and a ⏸ checkpoint.
   - `.claude/skills/` — repeatable procedures (deploy runbook, control-matrix update, blog drafting).
   - `.claude/agents/` — subagents (azure-architect, compliance-auditor, security-reviewer).
   - `.claude/rules/` — path-scoped conventions, so each app's team culture loads only for its files.
+  - **Hooks** — a `PreToolUse` hook rejecting any `git commit` message containing AI attribution.
+    🏛 The first appearance of the project's central distinction: `CLAUDE.md` is *context* and can
+    be ignored; a hook is *enforcement* and cannot. Same distinction as Azure Policy vs a written
+    standard in Act 7, and as a validated control vs an SOP in Act 8.
   - 🏛 How config resolves, and the decision rule for MCP vs skill vs subagent vs rule vs command.
 - **0.4** Local toolchain. Present: `node` 21, `python3`, `docker`, `git` 2.39. Missing and needed:
   `az` (+ `bicep`), `gh`, `dotnet`, `psql`, `uv` — installed as each Act needs them, not upfront.
