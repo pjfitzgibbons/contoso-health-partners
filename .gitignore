@@ -1,0 +1,46 @@
+# --- Secrets: the compliance-relevant section -------------------------------
+# A committed secret is a reportable event, not a cleanup task. Once it is in
+# git history it must be treated as disclosed and rotated, even after removal.
+# This list is defense-in-depth only; the real control is never writing a
+# secret to disk inside a repo in the first place.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.publishsettings
+azureauth.json
+auth0-config.json
+*.secrets.json
+secrets/
+
+# --- Personal, per-machine Claude Code config -------------------------------
+# Shared config (.claude/settings.json, .mcp.json, skills, rules) IS committed:
+# it is part of how the project is reproduced. Only per-person state is ignored.
+.claude/settings.local.json
+CLAUDE.local.md
+.claude/logs/
+
+# --- Real patient data ------------------------------------------------------
+# Nothing here should ever exist. The pattern is a tripwire: if git ever has
+# cause to ignore one of these, something has already gone wrong.
+*.phi.*
+*-real-data.*
+patient-export*
+
+# --- Editors and OS ---------------------------------------------------------
+.DS_Store
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+
+# --- Build output -----------------------------------------------------------
+node_modules/
+dist/
+build/
+.venv/
+__pycache__/
