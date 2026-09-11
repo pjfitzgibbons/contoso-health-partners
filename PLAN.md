@@ -79,6 +79,10 @@ Decided 2026-09-11. These govern what gets published, and they are not negotiabl
    *contents* are already safe; hostnames are the exposure.
 4. **Named vendors get verified before publication.** Characterizing a real business in public is
    a higher bar than a plan entry. Drafts use categories; names go in only after checking.
+5. **Intentionally insecure code is labeled as such, prominently.** The three app repos are public
+   and contain deliberately broken authentication in a health-adjacent context. Each gets a README
+   banner above the fold — *intentionally insecure, teaching artifact, do not deploy* — naming the
+   specific weaknesses and the Act that removes them. Non-negotiable before any app repo is pushed.
 
 ---
 
@@ -93,6 +97,25 @@ a **workspace, not a repo** — it holds the four clones plus the shared `CLAUDE
 | `patient-directory` | The Rolodex. Oldest, owned by the "enterprise" team, grudgingly ported forward. | C# / ASP.NET Core / EF Core / **SQL Server** | ~2016 | **Act 1** |
 | `referral-intake` | Escaped from the data team as a POC and became load-bearing. | Python / FastAPI / SQLModel / Postgres | ~2021 | **Act 2** |
 | `caretasks` | Care-coordinator task tracker. Contractor-built, newest, nobody left who wrote it. | TypeScript / Next.js / Prisma / Postgres | ~2024 | **Act 2** |
+
+**Repo naming.** Decided 2026-09-11. Local directory names serve the fiction; GitHub repo names
+serve discovery. They deliberately differ, which costs nothing and keeps `CLAUDE.md`, paths and the
+story clean.
+
+| Local directory | GitHub repo (`pjfitzgibbons`) | Created |
+|---|---|---|
+| `ms-security-docs` | **`contoso-health-partners`** — the hub | ✅ 2026-09-11, public |
+| `patient-directory` | `contoso-patient-directory` | Act 1 |
+| `referral-intake` | `contoso-referral-intake` | Act 2 |
+| `caretasks` | `contoso-caretasks` | Act 2 |
+
+Three rules: a shared **`contoso-`** prefix does the visual grouping, since GitHub has no folders;
+a shared **topic** (`contoso-health-partners`) does the actual discovery; and **the docs repo is the
+hub** — its README is the front door every post links to, pointing onward to the three apps.
+`contoso-` reads instantly as "fictional company, teaching artifact" to an audience that reads Azure
+documentation, which is the whole reason the premise picked the name. ⚠️ Microsoft publishes its own
+Contoso samples, so each app README carries a line disowning any official affiliation (Editorial
+rule 5).
 
 **Implementation follows era.** Decided 2026-09-11. We build oldest-first, because that is the
 order the org accumulated them and because each app inherits constraints from the one before it.
@@ -311,7 +334,8 @@ Eight Acts plus an Interlude. Each ends with a blog post and a ⏸ checkpoint.
 - **0.4** Local toolchain. Present: `node` 21, `python3`, `docker`, `git` 2.39.
   **Needed for Act 1:** `az` (+ `bicep`), `dotnet`, and a SQL Server client (🔍 **R5** — Azure Data
   Studio is retired; confirm the current recommendation is the VS Code MSSQL extension).
-  **Deferred:** `psql` and `uv` to Act 2, `gh` to Act 8.
+  ✅ **`gh` 2.100.0 installed and authenticated 2026-09-11** — pulled forward from Act 8 to create
+  the hub repo. **Deferred:** `psql` and `uv` to Act 2.
 
 **📝 Workbench track, Post W1:** *Setting up an AI-assisted engineering workbench for regulated
 cloud work.* Separate series, independent of the security-architecture thread — see Editorial
