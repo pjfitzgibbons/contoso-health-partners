@@ -18,12 +18,21 @@ analysis in `ms-security-docs/PLAN.md` — read it before proposing work.
 - [x] **0.2** `ms-security-docs` created. `PLAN.md`, `CLAUDE.workspace.md`, `.gitignore` committed.
       `~/programming/ms-security/CLAUDE.md` symlinked to `CLAUDE.workspace.md` so all four repos
       inherit it by ancestor lookup.
+      Published 2026-09-11 as **`pjfitzgibbons/contoso-health-partners`** (public). Local directory
+      names serve the fiction, GitHub names serve discovery — see PLAN.md *Repo naming*.
 - [ ] **0.3 ← resume here.** Claude Code config, one piece at a time with rationale before each:
       `.mcp.json` (Microsoft Learn server first) → `.claude/settings.json` → skills → subagents →
       path-scoped `.claude/rules/` → a `PreToolUse` hook that blocks AI attribution in commit
       messages (see hard rules; memory is context, a hook is enforcement).
-- [ ] **0.4** Install `az` + `bicep`. `gh`, `dotnet`, `psql`, `uv` deferred until their Act needs
-      them. Already present: `node` 21, `python3`, `docker`, `git` 2.39.
+      **Config resolution, verified 2026-09-12:** `CLAUDE.md` inherits from ancestor directories;
+      `.mcp.json` and `settings.json` do **not** — they anchor to the directory Claude launches
+      from. So each repo carries its own, and launching from the workspace root loads no MCP
+      servers at all.
+- [ ] **0.4** Install `az` + `bicep`. `dotnet` + a SQL Server client needed for Act 1.
+      `psql` and `uv` deferred to Act 2.
+      Present: `node` 21, `python3`, `docker`, `git` 2.39, **`gh` 2.100.0 (authenticated)**.
+- [ ] **0.5** Hub README for `contoso-health-partners` — deferred until Act 0 is otherwise done, so
+      it can describe a finished workbench rather than a plan.
 
 Update this section at every ⏸ checkpoint. Keep it to a resume point — narrative, decisions and
 detail belong in `ms-security-docs/PLAN.md`.

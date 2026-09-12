@@ -317,10 +317,33 @@ Eight Acts plus an Interlude. Each ends with a blog post and a ⏸ checkpoint.
   **Decided:** no AI attribution in any commit or document. Peter is sole author of record; a
   change record's authorship is a control (ALCOA+ *Attributable*), not a courtesy.
 - **0.3** ⏳ **Resume here.** Claude Code configuration, one piece at a time with reasoning for each:
-  - `.mcp.json` — **Microsoft Learn MCP** (`https://learn.microsoft.com/api/mcp`, HTTP, no auth)
-    so Azure answers come from current docs rather than recalled knowledge. There is already a
-    backlog of 🔍 tagged claims in this document waiting on it. **Azure MCP** (`@azure/mcp`)
-    arrives in Act 1; **Auth0 MCP** (`@auth0/auth0-mcp-server`) in Act 4.
+  - ✅ **`.mcp.json` — Microsoft Learn MCP**, added 2026-09-12. Endpoint
+    `https://learn.microsoft.com/api/mcp`, **streamable HTTP, no authentication, no charge**
+    (verified against Microsoft's own docs, not recalled). Three tools: search documentation,
+    fetch a full article, search code samples. Returns `405` in a browser — it is MCP-client-only,
+    so do not test it by visiting the URL.
+
+    **Chosen first deliberately.** 16 🔍 rows are blocked on it, and it is the lowest-risk server
+    that exists: read-only, unauthenticated, public content. If MCP configuration is going to
+    break, break it on something that cannot leak.
+
+    🏛 **Config resolution, verified 2026-09-12 — this extends the 0.2 rule.** `CLAUDE.md`
+    inherits from every ancestor directory. **`settings.json` and `.mcp.json` do not** — they
+    anchor to the directory Claude launches from. Therefore:
+    - **Each repo carries its own `.mcp.json`**, with the servers that repo actually needs. Not
+      duplication by laziness: Learn everywhere, **Azure MCP** (`@azure/mcp`) in the app repos
+      from Act 1, **Auth0 MCP** (`@auth0/auth0-mcp-server`) only from Act 4.
+    - **Launching `claude` from the workspace root loads the memory and zero MCP servers.** A real
+      gotcha; know it before it costs an evening.
+    - **Project scope over user scope**, deliberately — user scope would inject a Microsoft docs
+      server into unrelated projects, and it lives in `~/.claude.json`, which is not version
+      controlled and so can be neither a blog artifact nor something a cloner inherits.
+
+    🏛 **Standing rule, set now while it is free: never put a credential in `.mcp.json`.** It is
+    checked into a public repo. Nothing in the Learn config is secret, but Act 4's Auth0 server
+    will need one, and it goes in an environment variable or `headersHelper` — never inline.
+    Same principle as Act 7.1's managed identity: the safest secret is the one that is not there.
+    (Workspace hard rule: *never commit secrets*.)
   - `.claude/settings.json` — permissions and env; shared vs `settings.local.json`.
   - `.claude/skills/` — repeatable procedures (deploy runbook, control-matrix update, blog drafting).
   - `.claude/agents/` — subagents (azure-architect, compliance-auditor, security-reviewer).
