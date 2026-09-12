@@ -20,14 +20,24 @@ analysis in `ms-security-docs/PLAN.md` — read it before proposing work.
       inherit it by ancestor lookup.
       Published 2026-09-11 as **`pjfitzgibbons/contoso-health-partners`** (public). Local directory
       names serve the fiction, GitHub names serve discovery — see PLAN.md *Repo naming*.
-- [ ] **0.3 ← resume here.** Claude Code config, one piece at a time with rationale before each:
-      `.mcp.json` (Microsoft Learn server first) → `.claude/settings.json` → skills → subagents →
-      path-scoped `.claude/rules/` → a `PreToolUse` hook that blocks AI attribution in commit
-      messages (see hard rules; memory is context, a hook is enforcement).
+- [~] **0.3** Claude Code config, one piece at a time with rationale before each.
       **Config resolution, verified 2026-09-12:** `CLAUDE.md` inherits from ancestor directories;
       `.mcp.json` and `settings.json` do **not** — they anchor to the directory Claude launches
       from. So each repo carries its own, and launching from the workspace root loads no MCP
-      servers at all.
+      servers at all. Never put a credential in `.mcp.json` — it is committed to a public repo.
+  - [x] **`.mcp.json` — Microsoft Learn MCP** (`https://learn.microsoft.com/api/mcp`, streamable
+        http, no auth, no charge; verified against Microsoft docs). Written and committed
+        2026-09-12. **Not yet loaded** — project-scoped servers need approval on next launch.
+  - [ ] **← resume here. The `PreToolUse` attribution hook**, moved ahead of the rest on 2026-09-12.
+        It is the only item that is load-bearing today: every commit so far has relied on the rule
+        being followed rather than enforced. Memory is context and can be ignored; a hook cannot.
+  - [ ] `.claude/settings.json` — permissions and env; shared vs `settings.local.json`.
+  - [ ] `.claude/skills/` — deploy runbook, control-matrix update, blog drafting.
+  - [ ] `.claude/agents/` — azure-architect, compliance-auditor, security-reviewer.
+  - [ ] `.claude/rules/` — path-scoped, so each app's team culture loads only for its files.
+  - [ ] **First MCP verification:** ask it 🔍 **R1** — does Azure SQL Database serverless
+        auto-pause, and what is the current free-tier grant? Act 0's exit criterion is that the
+        server closes at least one 🔍 row.
 - [ ] **0.4** Install `az` + `bicep`. `dotnet` + a SQL Server client needed for Act 1.
       `psql` and `uv` deferred to Act 2.
       Present: `node` 21, `python3`, `docker`, `git` 2.39, **`gh` 2.100.0 (authenticated)**.

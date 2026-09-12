@@ -344,15 +344,15 @@ Eight Acts plus an Interlude. Each ends with a blog post and a ⏸ checkpoint.
     will need one, and it goes in an environment variable or `headersHelper` — never inline.
     Same principle as Act 7.1's managed identity: the safest secret is the one that is not there.
     (Workspace hard rule: *never commit secrets*.)
-  - `.claude/settings.json` — permissions and env; shared vs `settings.local.json`.
-  - `.claude/skills/` — repeatable procedures (deploy runbook, control-matrix update, blog drafting).
-  - `.claude/agents/` — subagents (azure-architect, compliance-auditor, security-reviewer).
-  - `.claude/rules/` — path-scoped conventions, so each app's team culture loads only for its files.
-  - **Hooks** — a `PreToolUse` hook rejecting any `git commit` message containing AI attribution.
+  - ⏳ **Hooks — next.** *(Moved ahead of the rest 2026-09-12.)*  a `PreToolUse` hook rejecting any `git commit` message containing AI attribution.
     🏛 The project's central distinction, in miniature: **`CLAUDE.md` is context and can be
     ignored; a hook is enforcement and cannot.** Same distinction as Azure Policy vs a written
     standard in Act 7, and as a validated control vs an SOP in Act 8. The lesson is
     *authorship of a change record is a control* — the hook is merely how it's implemented.
+  - `.claude/settings.json` — permissions and env; shared vs `settings.local.json`.
+  - `.claude/skills/` — repeatable procedures (deploy runbook, control-matrix update, blog drafting).
+  - `.claude/agents/` — subagents (azure-architect, compliance-auditor, security-reviewer).
+  - `.claude/rules/` — path-scoped conventions, so each app's team culture loads only for its files.
   - 🏛 How config resolves, and the decision rule for MCP vs skill vs subagent vs rule vs command.
 - **0.4** Local toolchain. Present: `node` 21, `python3`, `docker`, `git` 2.39.
   **Needed for Act 1:** `az` (+ `bicep`), `dotnet`, and a SQL Server client (🔍 **R5** — Azure Data
