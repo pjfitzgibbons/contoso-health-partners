@@ -1,6 +1,6 @@
 # PLAN — From Three Legacy Apps to a Compliant Identity Platform on Azure
 
-**Status:** Act 0.3 — Claude Code configuration · Last updated 2026-09-11
+**Status:** Act 0.3 — Claude Code configuration · Last updated 2026-09-12
 
 > **Scheduled split:** this document is at the practical ceiling for something read end-to-end
 > before every session. **At the Act 1 checkpoint, split it** — blog drafts and the control matrix
@@ -317,19 +317,93 @@ Eight Acts plus an Interlude. Each ends with a blog post and a ⏸ checkpoint.
   **Decided:** no AI attribution in any commit or document. Peter is sole author of record; a
   change record's authorship is a control (ALCOA+ *Attributable*), not a courtesy.
 - **0.3** ⏳ **Resume here.** Claude Code configuration, one piece at a time with reasoning for each:
-  - `.mcp.json` — **Microsoft Learn MCP** (`https://learn.microsoft.com/api/mcp`, HTTP, no auth)
-    so Azure answers come from current docs rather than recalled knowledge. There is already a
-    backlog of 🔍 tagged claims in this document waiting on it. **Azure MCP** (`@azure/mcp`)
-    arrives in Act 1; **Auth0 MCP** (`@auth0/auth0-mcp-server`) in Act 4.
-  - `.claude/settings.json` — permissions and env; shared vs `settings.local.json`.
-  - `.claude/skills/` — repeatable procedures (deploy runbook, control-matrix update, blog drafting).
-  - `.claude/agents/` — subagents (azure-architect, compliance-auditor, security-reviewer).
-  - `.claude/rules/` — path-scoped conventions, so each app's team culture loads only for its files.
-  - **Hooks** — a `PreToolUse` hook rejecting any `git commit` message containing AI attribution.
+  - ✅ **`.mcp.json` — Microsoft Learn MCP**, added 2026-09-12. Endpoint
+    `https://learn.microsoft.com/api/mcp`, **streamable HTTP, no authentication, no charge**
+    (verified against Microsoft's own docs, not recalled). Three tools: search documentation,
+    fetch a full article, search code samples. Returns `405` in a browser — it is MCP-client-only,
+    so do not test it by visiting the URL.
+
+    **Chosen first deliberately.** 16 🔍 rows are blocked on it, and it is the lowest-risk server
+    that exists: read-only, unauthenticated, public content. If MCP configuration is going to
+    break, break it on something that cannot leak.
+
+    🏛 **Config resolution, verified 2026-09-12 — this extends the 0.2 rule.** `CLAUDE.md`
+    inherits from every ancestor directory. **`settings.json` and `.mcp.json` do not** — they
+    anchor to the directory Claude launches from. Therefore:
+    - **Each repo carries its own `.mcp.json`**, with the servers that repo actually needs. Not
+      duplication by laziness: Learn everywhere, **Azure MCP** (`@azure/mcp`) in the app repos
+      from Act 1, **Auth0 MCP** (`@auth0/auth0-mcp-server`) only from Act 4.
+    - **Launching `claude` from the workspace root loads the memory and zero MCP servers.** A real
+      gotcha; know it before it costs an evening.
+    - **Project scope over user scope**, deliberately — user scope would inject a Microsoft docs
+      server into unrelated projects, and it lives in `~/.claude.json`, which is not version
+      controlled and so can be neither a blog artifact nor something a cloner inherits.
+
+    🏛 **Standing rule, set now while it is free: never put a credential in `.mcp.json`.** It is
+    checked into a public repo. Nothing in the Learn config is secret, but Act 4's Auth0 server
+    will need one, and it goes in an environment variable or `headersHelper` — never inline.
+    Same principle as Act 7.1's managed identity: the safest secret is the one that is not there.
+    (Workspace hard rule: *never commit secrets*.)
+  - ✅ **`PreToolUse` attribution hook**, added 2026-09-12. *(Moved ahead of the rest the same
+    day.)* `.claude/hooks/no-ai-attribution.sh`, wired by `.claude/settings.json` with matcher
+    `Bash`. Reads the tool call as JSON on stdin; if the command is a commit or a `gh pr`
+    create/edit whose text carries `Co-Authored-By …Claude/Anthropic`, `Claude-Session:`,
+    "Generated with Claude Code", or a `claude.ai/code` link, it exits **2** — Claude Code blocks
+    the call and feeds stderr back to the model, which rewrites the message. Also reads
+    `-F`/`--file`/`--body-file` targets, since those keep the message out of the command string.
+    A human `Co-Authored-By` passes; a co-author is a legitimate record.
     🏛 The project's central distinction, in miniature: **`CLAUDE.md` is context and can be
     ignored; a hook is enforcement and cannot.** Same distinction as Azure Policy vs a written
     standard in Act 7, and as a validated control vs an SOP in Act 8. The lesson is
     *authorship of a change record is a control* — the hook is merely how it's implemented.
+    📝 **The threat is not hypothetical.** Every Claude Code session receives a harness
+    instruction to append `Co-Authored-By: Claude …` and a `Claude-Session:` URL to each commit.
+    Before this hook, the only thing between that instruction and the git log was the model
+    reading `CLAUDE.md` and choosing to comply. Five commits relied on that choice.
+    📝 **It went live instantly and its first real catch was a false positive.** Claude Code
+    2.1.269 picked up `settings.json` with no restart (observed, not recalled). The next command
+    was a heredoc writing *this paragraph* into PLAN.md — prose containing the words "git commit"
+    and "Co-Authored-By …Claude" — and the hook blocked it. The first draft matched on command
+    *text*; a control that fires on false positives gets worked around, which is worse than no
+    control. Fixed by anchoring the verb to command position (start of line, or after `;` `&&`
+    `||` `|` `(` `$(`), not by rewording the prose to slip past it.
+    **Decided:** the script lives in a file, not inline in the JSON — a hook you cannot run by
+    hand against sample input is a hook you cannot test. **A control gets a test:**
+    `no-ai-attribution.test.sh`, 15 cases (7 allow, 8 block). The test had to be its own file
+    because the live hook blocked the Bash command that would have written its fixtures — a test
+    fixture and a real commit look the same from stdin, and that is correct behaviour.
+    **Scope of the guard:** only `Bash` can run `git`, so watching `Bash` covers the commit
+    action completely. Other tools can write files, and the `-F` handling covers that route.
+    **Same caveat as `.mcp.json`:** `settings.json` anchors to the launch directory, so each app
+    repo carries a copy when it is created.
+  - ✅ **`.claude/settings.json` — attribution, permissions, no env**, 2026-09-12.
+    🏛 **Decision rule for shared vs local:** local overrides shared on every key *except*
+    `deny`, which wins from any file. So **shared = rules and enforcement** (`deny`, hooks,
+    `attribution`); **local = trust and convenience** (MCP approvals, personal `allow`). Shared
+    `allow` only for what no collaborator would object to: read-only git, the hook test, the
+    three Learn MCP tools.
+    **Hard rules in machine form:** `deny: Read(…)` mirroring `.gitignore`'s secret patterns —
+    a secret Claude cannot read cannot reach a commit, a doc, or a transcript. `deny:
+    Bash(git push:*)` — nothing leaves the machine without Peter. `git commit` stays at ask.
+    **`attribution: {commit:"", pr:"", sessionUrl:false}`** — the supported setting (docs
+    verified 2026-09-12; `includeCoAuthoredBy` is deprecated). Layer 1 of three: setting
+    removes the instruction at source, `CLAUDE.md` is context, the hook is enforcement.
+    **Observed:** the harness instruction flipped to "do not add attribution lines" the moment
+    the file was saved — settings are live without restart, as hooks were.
+    **Verified live:** `Read(./.env)` deny fires on the *path* — the file need not exist — and
+    also blocked a **Bash** command that would have written `.env`. `git push --dry-run` denied.
+    **Deferred:** `ask: Bash(az …)` for the billable-resource rule → 0.4, when `az` exists.
+    `env` absent on purpose; this repo needs none.
+    **Limitation:** permission globs have no negation, so `.gitignore`'s `.env.*` minus
+    `.env.example` cannot be expressed. Denied `.env` and `.env.local` by name here; the app
+    repos must choose between the glob and the example file.
+    **Recommended to Peter, his call:** drop `enableAllProjectMcpServers: true` from
+    `settings.local.json` — it auto-approves any server a future `.mcp.json` adds (Auth0 in
+    Act 4, or anything a PR adds); the explicit `enabledMcpjsonServers` list already there is
+    the safer posture and makes the flag redundant.
+  - `.claude/skills/` — repeatable procedures (deploy runbook, control-matrix update, blog drafting).
+  - `.claude/agents/` — subagents (azure-architect, compliance-auditor, security-reviewer).
+  - `.claude/rules/` — path-scoped conventions, so each app's team culture loads only for its files.
   - 🏛 How config resolves, and the decision rule for MCP vs skill vs subagent vs rule vs command.
 - **0.4** Local toolchain. Present: `node` 21, `python3`, `docker`, `git` 2.39.
   **Needed for Act 1:** `az` (+ `bicep`), `dotnet`, and a SQL Server client (🔍 **R5** — Azure Data
@@ -337,9 +411,14 @@ Eight Acts plus an Interlude. Each ends with a blog post and a ⏸ checkpoint.
   ✅ **`gh` 2.100.0 installed and authenticated 2026-09-11** — pulled forward from Act 8 to create
   the hub repo. **Deferred:** `psql` and `uv` to Act 2.
 
-**📝 Workbench track, Post W1:** *Setting up an AI-assisted engineering workbench for regulated
-cloud work.* Separate series, independent of the security-architecture thread — see Editorial
-rule 1.
+**📝 Workbench track, Post W1:** *Blocking AI Attribution in Git Commits.* Drafted 2026-09-12 at
+`blog/w1-blocking-ai-attribution-in-git-commits.md` — Peter's call the same day: the attribution hook
+is a post on its own, an annoyance many face, and it has a narrative (rule → enforcement →
+enforcement bites its author three times → control gets a test). Self-contained today, so it
+publishes first. *(Proposed: the setup post below shifts to W2.)*
+**📝 Workbench track, Post W2:** *Setting up an AI-assisted engineering workbench for regulated
+cloud work.* Publishes at the Act 0 checkpoint, once 0.3 and 0.4 are done. Separate series,
+independent of the security-architecture thread — see Editorial rule 1.
 **⏸ Checkpoint:** config reviewed, tooling installed, nothing in the cloud.
 
 ---

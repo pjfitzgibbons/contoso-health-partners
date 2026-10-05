@@ -18,12 +18,54 @@ analysis in `ms-security-docs/PLAN.md` — read it before proposing work.
 - [x] **0.2** `ms-security-docs` created. `PLAN.md`, `CLAUDE.workspace.md`, `.gitignore` committed.
       `~/programming/ms-security/CLAUDE.md` symlinked to `CLAUDE.workspace.md` so all four repos
       inherit it by ancestor lookup.
-- [ ] **0.3 ← resume here.** Claude Code config, one piece at a time with rationale before each:
-      `.mcp.json` (Microsoft Learn server first) → `.claude/settings.json` → skills → subagents →
-      path-scoped `.claude/rules/` → a `PreToolUse` hook that blocks AI attribution in commit
-      messages (see hard rules; memory is context, a hook is enforcement).
-- [ ] **0.4** Install `az` + `bicep`. `gh`, `dotnet`, `psql`, `uv` deferred until their Act needs
-      them. Already present: `node` 21, `python3`, `docker`, `git` 2.39.
+      Published 2026-09-11 as **`pjfitzgibbons/contoso-health-partners`** (public). Local directory
+      names serve the fiction, GitHub names serve discovery — see PLAN.md *Repo naming*.
+- [~] **0.3** Claude Code config, one piece at a time with rationale before each.
+      **Config resolution, verified 2026-09-12:** `CLAUDE.md` inherits from ancestor directories;
+      `.mcp.json` and `settings.json` do **not** — they anchor to the directory Claude launches
+      from. So each repo carries its own, and launching from the workspace root loads no MCP
+      servers at all. Never put a credential in `.mcp.json` — it is committed to a public repo.
+  - [x] **`.mcp.json` — Microsoft Learn MCP** (`https://learn.microsoft.com/api/mcp`, streamable
+        http, no auth, no charge; verified against Microsoft docs). Written and committed
+        2026-09-12. Approved and loaded 2026-09-12 (`enabledMcpjsonServers` in
+        `settings.local.json`); the 🔍 **R1** check below is still open.
+  - [x] **`.mcp.json` — wp-blockmarkup MCP** (`npx wp-blockmarkup-mcp`, local process, no auth,
+        no charge). Added 2026-09-22 for the W1 publish: it checks Gutenberg markup against the
+        block schemas the site actually registers, rather than against the handbook. Unlike the
+        Learn server this one runs code on the machine — the trade Peter accepted knowingly.
+  - [x] **`PreToolUse` attribution hook** — `.claude/hooks/no_ai_attribution.py` + its test,
+        wired by `.claude/settings.json` (matcher `Bash`, exit 2 blocks). Written, tested, and
+        live 2026-09-12; rewritten from bash to Python 2026-09-22, 18 cases in 6 methods.
+        `dogfood.sh` is the end-to-end check — a real session in a throwaway repo, told to commit
+        with attribution; Peter runs it, it is not part of the unit suite. Memory is context and
+        can be ignored; a hook cannot. Each app repo will carry a copy — `settings.json` does
+        not inherit.
+  - [x] `.claude/settings.json` — `attribution` off, `deny` for secret paths and `git push`,
+        minimal shared `allow`, no `env`. Verified live 2026-09-12. Rule: shared = rules and
+        enforcement, local = trust and convenience (`deny` wins from any file).
+  - [x] **Post W1 published 2026-09-22** — `blog/w1-blocking-ai-attribution-in-git-commits.md`,
+        pushed live by the `wp-publish` skill. Drafted 2026-09-12; posting deferred 2026-09-14
+        until Peter had run Claude with the settings loaded for a while. Setup post → W2.
+        Thesis to revisit: the user must understand every configuration layer that
+        touches an outcome they will defend — harness default, `attribution`,
+        `includeGitInstructions`, `CLAUDE.md`, the hook, and the launch directory that scopes
+        them. Fact outline in `blog/w1-outline.md`.
+  - [~] `.claude/skills/` — **`wp-publish` written 2026-09-22**: Markdown in `blog/` is the
+        source of truth, WordPress is a rendering target. The application password lives in
+        `~/.netrc`, outside every repo by design. **← resume here** — still to write: deploy
+        runbook, control-matrix update, blog drafting.
+  - [ ] `.claude/agents/` — azure-architect, compliance-auditor, security-reviewer.
+  - [~] `.claude/rules/` — path-scoped, so each app's team culture loads only for its files.
+        `blog-voice.md` (scoped to `blog/**`) written 2026-09-22; the per-app rules wait for the
+        app repos to exist.
+  - [ ] **First MCP verification:** ask it 🔍 **R1** — does Azure SQL Database serverless
+        auto-pause, and what is the current free-tier grant? Act 0's exit criterion is that the
+        server closes at least one 🔍 row.
+- [ ] **0.4** Install `az` + `bicep`. `dotnet` + a SQL Server client needed for Act 1.
+      `psql` and `uv` deferred to Act 2.
+      Present: `node` 21, `python3`, `docker`, `git` 2.39, **`gh` 2.100.0 (authenticated)**.
+- [ ] **0.5** Hub README for `contoso-health-partners` — deferred until Act 0 is otherwise done, so
+      it can describe a finished workbench rather than a plan.
 
 Update this section at every ⏸ checkpoint. Keep it to a resume point — narrative, decisions and
 detail belong in `ms-security-docs/PLAN.md`.

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "microsoft-learn": {
+      "type": "http",
+      "url": "https://learn.microsoft.com/api/mcp"
+    },
+    "wp-blockmarkup": {
+      "command": "npx",
+      "args": [
+        "wp-blockmarkup-mcp"
+      ]
+    }
+  }
+}
