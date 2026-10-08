@@ -44,3 +44,9 @@ dist/
 build/
 .venv/
 __pycache__/
+
+# --- Local scratch ----------------------------------------------------------
+# Working space for fetched references, drafts, and experiments. Never committed:
+# nothing here is a project artifact, and third-party material kept for reading
+# is not ours to redistribute from a public repo.
+.tmp/

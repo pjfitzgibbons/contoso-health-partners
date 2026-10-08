@@ -419,6 +419,12 @@ publishes first. *(Proposed: the setup post below shifts to W2.)*
 **📝 Workbench track, Post W2:** *Setting up an AI-assisted engineering workbench for regulated
 cloud work.* Publishes at the Act 0 checkpoint, once 0.3 and 0.4 are done. Separate series,
 independent of the security-architecture thread — see Editorial rule 1.
+**📝 Learnings track, `L#`:** findings worth publishing that the work turned up on its own. A W post
+is scheduled — the plan names it, and it publishes when its Act closes. An L post is discovered, and
+it publishes when it is ready, so no slot is reserved here and the Acts do not gate it. Track
+definitions and the filename convention live in `.claude/rules/blog-voice.md` under *Tracks and
+numbering*. First one: **L1** *Instructions Inherit, Enforcement Doesn't: Claude Code Across Many
+Repos* — drafted 2026-10-08 at `blog/l1-multi-repo-config.md`.
 **⏸ Checkpoint:** config reviewed, tooling installed, nothing in the cloud.
 
 ---
