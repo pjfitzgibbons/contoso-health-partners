@@ -107,21 +107,49 @@ def api(method: str, path: str, params: dict | None = None, body: dict | None = 
         die(f"cannot reach {SITE}: {e.reason}")
 
 
+TERM_LABEL = {"categories": "category", "tags": "tag"}
+
+
 def term_ids(taxonomy: str, names: list[str], create: bool, dry_run: bool) -> list[int | None]:
-    """Resolve term names to ids. Categories must exist; tags are created on demand."""
+    """Resolve term names to ids. Categories must exist; tags are created on demand.
+
+    The split is about taxonomy structure, not about capability. Categories are
+    the site's shape and that is Peter's decision, so a missing one is an error.
+    Tags are free-form labels, so a missing one is created.
+
+    Creating a tag is safe for the `wp_publisher` role to do. Measured against
+    the live site on 2026-10-10: without `manage_categories` the account creates
+    a tag happily, and is refused on editing or deleting ANY term, including one
+    it just created. WordPress draws create-without-destroy here on its own.
+
+    Every missing category is collected before failing, so one run names all of
+    them rather than one per attempt.
+    """
+    label = TERM_LABEL.get(taxonomy, taxonomy)
     ids: list[int | None] = []
+    missing: list[str] = []
     for name in names:
         found = api("GET", f"/{taxonomy}", {"search": name, "per_page": 100, "_fields": "id,name"})
         match = next((t for t in found if html.unescape(t["name"]).casefold() == name.casefold()), None)
         if match:
             ids.append(match["id"])
         elif not create:
-            die(f"{taxonomy[:-3]}y {name!r} does not exist on the site; create it in WP Admin first")
+            missing.append(name)
         elif dry_run:
-            print(f"  would create tag {name!r}")
+            print(f"  would create {label} {name!r}")
             ids.append(None)
         else:
             ids.append(api("POST", f"/{taxonomy}", body={"name": name})["id"])
+    if missing:
+        lines = [f"no such {label} on the site: " + ", ".join(repr(m) for m in missing),
+                 "nothing was sent. Taxonomy structure is a human decision, so create them in "
+                 "WP Admin, or with the admin credential:"]
+        for m in missing:
+            lines.append(
+                f"  curl -sS --netrc-file ~/.config/wp-publish/netrc-admin "
+                f"-X POST {SITE}/wp-json/wp/v2/{taxonomy} "
+                f"-H 'Content-Type: application/json' -d '{json.dumps({'name': m})}'")
+        die("\n".join(lines))
     return ids
 
 
@@ -207,10 +235,12 @@ def main() -> int:
         if post.get(key):
             payload[key] = str(post[key])
     if post.get("categories"):
-        payload["categories"] = term_ids("categories", list(post["categories"]), create=False, dry_run=args.dry_run)
+        payload["categories"] = term_ids("categories", list(post["categories"]),
+                                         create=False, dry_run=args.dry_run)
         print(f"  categories: {dict(zip(post['categories'], payload['categories']))}")
     if post.get("tags"):
-        payload["tags"] = term_ids("tags", list(post["tags"]), create=True, dry_run=args.dry_run)
+        payload["tags"] = term_ids("tags", list(post["tags"]),
+                                   create=True, dry_run=args.dry_run)
         print(f"  tags:       {dict(zip(post['tags'], payload['tags']))}")
     kind = "HTML (--classic)" if args.classic else "Gutenberg blocks"
     print(f"  content: {len(rendered)} bytes of {kind} from {len(body)} bytes of Markdown")

@@ -154,6 +154,24 @@ Written text has no speaker. The reader supplies one, in their own inner voice. 
 - **A snippet does not.** A multi-line example that is not a specific file (a command, a sample message, a fragment) carries no path.
 - **Inline up to `MAX_INLINE_LINES = 50`.** Longer than that: show the essential part inline and link the whole file — in the project repo if it lives there, otherwise in a gist. Tune the number here.
 
+## Tracks and numbering
+
+Three series, and the prefix is part of the filename and of the draft subtitle.
+
+| Prefix | Series | Numbering |
+|---|---|---|
+| none | The security-architecture thread — Posts 1–9, tied to the Acts | PLAN.md reserves the slot |
+| `W#` | **Workbench** — the planned harness and tooling posts, published at Act checkpoints | PLAN.md reserves the slot |
+| `L#` | **Learnings** — what a session turned up that was worth writing down, outside the plan | Publication order; no slot reserved |
+
+A W post is scheduled: the plan names it before it is written, and it publishes when its Act closes. An L post is discovered: the work produced a finding that stands on its own, and it publishes when it is ready. If a draft is waiting on an Act, it is a W; if it is waiting on nothing, it is an L.
+
+Filename is the prefix, lowercased, then the slug: `w1-blocking-ai-attribution-in-git-commits.md`, `l1-multi-repo-config.md`. The `slug:` frontmatter matches the filename stem, so the published URL carries the prefix too.
+
+The draft subtitle names the track: `*Learnings track, L1 · Draft, 2026-10-08 · Claude Code v2.1.289*`. Delete the whole line when `status:` flips to `publish`.
+
+A correction to a published post is an append under *Updates*, not a new number — unless the correction is large enough to carry its own position, in which case it becomes the next L and links back.
+
 ## Frontmatter contract
 
 The Markdown file is the source of truth; WordPress renders it. The block at the top:
