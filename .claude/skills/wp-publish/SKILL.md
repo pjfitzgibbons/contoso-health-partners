@@ -31,12 +31,12 @@ turn. Posting is outward-facing; the keystroke that flips it is his.
    ---
    ```
    `title:` defaults to the first `# ` heading (which is then removed from the body so the site
-   doesn't show it twice). `slug:` defaults to the filename stem. **Categories and tags must
-   both already exist on the site.** The script refuses rather than creates, and names every
-   missing term in one go with the `curl` that would create it. Two reasons: taxonomy structure
-   is Peter's decision, and creating a term needs `manage_categories`, a capability that equally
-   permits renaming and deleting every category and tag on the site — more reach than spelling a
-   new tag is worth. See *The publishing identity* below.
+   doesn't show it twice). `slug:` defaults to the filename stem. **Categories must already
+   exist** — they are the site's shape and that is Peter's decision, so the script names every
+   missing one in a single failure, each with the `curl` that would create it. **Tags are
+   created on demand**, being free-form labels. That is safe for the publishing role to do:
+   measured on the live site, it can create a tag but is refused on editing or deleting *any*
+   term, even one it just created.
 2. **Dry-run yourself** — read-only against the site, safe to execute:
    ```bash
    uv run --script .claude/skills/wp-publish/wp_publish.py blog/POST.md --dry-run
@@ -168,25 +168,39 @@ The fix is a separate account whose capabilities are the limit:
 
 | | |
 |---|---|
+| Account | `wp-publish` (user 3), `peter.fitzgibbons+wp-publish@gmail.com` |
 | Role | `wp_publisher`, defined in `wp-publisher-role.php` |
 | Install as | `wp-content/mu-plugins/wp-publisher-role.php` on the server |
-| Holds | `read`, `edit_posts`, `publish_posts`, `edit_published_posts`, `view_koko_analytics` |
-| Withholds | `manage_categories`, `unfiltered_html`, `upload_files`, `delete_posts`, `delete_published_posts`, `moderate_comments`, `activate_plugins`, everything else |
+| Holds | `read`, `edit_posts`, `publish_posts`, `edit_published_posts`, `edit_others_posts`, `view_koko_analytics` |
+| Withholds | `manage_categories`, `unfiltered_html`, `upload_files`, `delete_posts`, `delete_published_posts`, `moderate_comments`, `activate_plugins`, `manage_options`, everything else |
 
 The role lives in an **mu-plugin** so it cannot be deactivated from WP Admin, and in **this
 repo** so the capability set is a reviewable diff rather than a checkbox someone ticked once.
-The file documents every withheld capability and why — read it before adding one back.
+The file documents every withheld capability and why — read it before adding one back. Changing
+`CAPS` requires bumping `VERSION` in the same file, or nothing is re-applied.
 
-What the reduced role costs, by design:
+**`edit_others_posts` is in there, and it is the interesting one.** WordPress uses a single
+field, `post_author`, as both the access-control subject *and* the public byline. Every post on
+the site is authored by Peter, so a service account without this capability can create new posts
+and never update an existing one — verified: a no-op update of W1 returned 403 and an
+edit-context post listing returned zero rows. The alternative, reassigning posts to the service
+account, would put a robot in the byline of a blog about authorship as a control. So the byline
+stays right and the capability widens. Worth knowing before designing the same thing elsewhere.
 
-- **Tags and categories must pre-exist.** See the frontmatter step above.
+What the reduced role costs, measured rather than assumed:
+
 - **`wp_report.py` sees approved comments only**, and prints `?` for held, spam and trash rather
   than a misleading `0`. Reading those needs `moderate_comments`, which also approves and
   deletes comments; it cannot be granted for reading alone.
 - **The traffic probe cannot read the plugin list** and degrades to the REST namespace check and
   the page scan. That is sufficient — Koko Analytics registers `koko-analytics/v1`.
-- **No `unfiltered_html`**, so post content cannot carry `<script>`. A credential an agent
-  drives should not be able to put executable JavaScript on the site.
+- **Nothing is lost to KSES.** Without `unfiltered_html`, WordPress filters post content, and
+  every shape this toolchain emits survives it: block delimiters, block attribute JSON, the
+  generated `wp-block-syntaxhighlighter-code` class, `wp:list-item` wrappers, the `wp:html`
+  footnotes div, and `data-` attributes. A `<script>` in the same probe was stripped, which is
+  how we know the filter ran. Post content therefore cannot carry executable JavaScript.
+- **It cannot delete a post**, not even a draft it just created. Removing a post is a human
+  decision taken in WP Admin.
 
 ## Credentials
 

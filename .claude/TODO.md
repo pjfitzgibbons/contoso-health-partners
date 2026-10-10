@@ -93,6 +93,16 @@ row. Park them here; move them when the matrix is born.
       credential moved to `netrc-admin` and is now passed explicitly. The underlying platform
       weakness is not fixable and belongs in the matrix as an accepted risk with a compensating
       control.
+- [ ] 📝 **WordPress uses `post_author` as both the access-control subject and the public byline.**
+      So a least-privilege publishing identity and a human byline are in direct conflict: either
+      the service account owns the posts and appears as their author, or it does not own them and
+      needs `edit_others_posts` to touch them. Measured 2026-10-10 with a role holding
+      `edit_posts` + `edit_published_posts` but not `edit_others_posts`: a no-op update of W1
+      returned 403, an edit-context post listing returned 0 rows, and the real `wp_publish.py`
+      failed on its pre-update read. Resolved by granting `edit_others_posts` and keeping the
+      byline correct, since authorship of record is the control this project is about. Generalises
+      past WordPress — any system that conflates ownership with attribution forces this trade.
+      Strong L-track material.
 - [ ] **Koko Analytics cookieless mode reads the client IP.** `xxh64(daily_seed + user_agent + ip)`
       with a 16-byte seed rotated daily and session files wiped daily; the IP is never stored.
       Chosen 2026-10-10 over the cookie method, which never touches the IP but would require a

@@ -21,8 +21,7 @@ The file's YAML frontmatter is the control surface:
     slug:                     # default: filename stem
     excerpt:
     categories: [Name, ...]   # must already exist on the site (structure is Peter's call)
-    tags: [name, ...]         # must already exist too; creating a term needs
-                              # manage_categories, which also deletes terms
+    tags: [name, ...]         # created if missing
     date: 2026-09-12T09:00    # optional, site-local time
     wp_id: 123                # written back here by this script after the first create
 
@@ -111,32 +110,40 @@ def api(method: str, path: str, params: dict | None = None, body: dict | None = 
 TERM_LABEL = {"categories": "category", "tags": "tag"}
 
 
-def term_ids(taxonomy: str, names: list[str]) -> list[int]:
-    """Resolve term names to ids. Terms must already exist, in BOTH taxonomies.
+def term_ids(taxonomy: str, names: list[str], create: bool, dry_run: bool) -> list[int | None]:
+    """Resolve term names to ids. Categories must exist; tags are created on demand.
 
-    Nothing is created here. Creating a term needs `manage_categories`, and that
-    one capability equally permits renaming and deleting every category and tag
-    on the site -- far too much reach to hold just to spell a new tag. The role
-    in wp-publisher-role.php withholds it, so this function does not ask for it.
-    Taxonomy structure is a human decision in any case, which is why categories
-    already worked this way; tags now match.
+    The split is about taxonomy structure, not about capability. Categories are
+    the site's shape and that is Peter's decision, so a missing one is an error.
+    Tags are free-form labels, so a missing one is created.
 
-    Every missing term is collected before failing, so one run names all of them
-    instead of one per attempt.
+    Creating a tag is safe for the `wp_publisher` role to do. Measured against
+    the live site on 2026-10-10: without `manage_categories` the account creates
+    a tag happily, and is refused on editing or deleting ANY term, including one
+    it just created. WordPress draws create-without-destroy here on its own.
+
+    Every missing category is collected before failing, so one run names all of
+    them rather than one per attempt.
     """
     label = TERM_LABEL.get(taxonomy, taxonomy)
-    ids: list[int] = []
+    ids: list[int | None] = []
     missing: list[str] = []
     for name in names:
         found = api("GET", f"/{taxonomy}", {"search": name, "per_page": 100, "_fields": "id,name"})
         match = next((t for t in found if html.unescape(t["name"]).casefold() == name.casefold()), None)
         if match:
             ids.append(match["id"])
-        else:
+        elif not create:
             missing.append(name)
+        elif dry_run:
+            print(f"  would create {label} {name!r}")
+            ids.append(None)
+        else:
+            ids.append(api("POST", f"/{taxonomy}", body={"name": name})["id"])
     if missing:
         lines = [f"no such {label} on the site: " + ", ".join(repr(m) for m in missing),
-                 "nothing was sent. Create them in WP Admin, or with the admin credential:"]
+                 "nothing was sent. Taxonomy structure is a human decision, so create them in "
+                 "WP Admin, or with the admin credential:"]
         for m in missing:
             lines.append(
                 f"  curl -sS --netrc-file ~/.config/wp-publish/netrc-admin "
@@ -228,10 +235,12 @@ def main() -> int:
         if post.get(key):
             payload[key] = str(post[key])
     if post.get("categories"):
-        payload["categories"] = term_ids("categories", list(post["categories"]))
+        payload["categories"] = term_ids("categories", list(post["categories"]),
+                                         create=False, dry_run=args.dry_run)
         print(f"  categories: {dict(zip(post['categories'], payload['categories']))}")
     if post.get("tags"):
-        payload["tags"] = term_ids("tags", list(post["tags"]))
+        payload["tags"] = term_ids("tags", list(post["tags"]),
+                                   create=True, dry_run=args.dry_run)
         print(f"  tags:       {dict(zip(post['tags'], payload['tags']))}")
     kind = "HTML (--classic)" if args.classic else "Gutenberg blocks"
     print(f"  content: {len(rendered)} bytes of {kind} from {len(body)} bytes of Markdown")
