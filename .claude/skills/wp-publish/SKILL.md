@@ -31,9 +31,12 @@ turn. Posting is outward-facing; the keystroke that flips it is his.
    ---
    ```
    `title:` defaults to the first `# ` heading (which is then removed from the body so the site
-   doesn't show it twice). `slug:` defaults to the filename stem. Categories must already exist
-   on the site — taxonomy structure is Peter's decision, so the script refuses rather than
-   creates. Tags are created on demand.
+   doesn't show it twice). `slug:` defaults to the filename stem. **Categories and tags must
+   both already exist on the site.** The script refuses rather than creates, and names every
+   missing term in one go with the `curl` that would create it. Two reasons: taxonomy structure
+   is Peter's decision, and creating a term needs `manage_categories`, a capability that equally
+   permits renaming and deleting every category and tag on the site — more reach than spelling a
+   new tag is worth. See *The publishing identity* below.
 2. **Dry-run yourself** — read-only against the site, safe to execute:
    ```bash
    uv run --script .claude/skills/wp-publish/wp_publish.py blog/POST.md --dry-run
@@ -153,16 +156,55 @@ When the probe *does* find a source, the script names it and stops. It deliberat
 read any analytics API — each one has its own auth, and inventing a client for one on the fly is
 how a made-up number gets published.
 
+## The publishing identity
+
+The toolchain does **not** authenticate as Peter. A WordPress application password inherits
+every capability of the user it belongs to and **cannot be scoped down** — there is no
+publish-only or read-only variant. So the first application password here, created to post a
+blog draft, could also install and delete plugins. It did, in fact: it is what removed five
+plugins on 2026-10-10. That is the finding that produced this section.
+
+The fix is a separate account whose capabilities are the limit:
+
+| | |
+|---|---|
+| Role | `wp_publisher`, defined in `wp-publisher-role.php` |
+| Install as | `wp-content/mu-plugins/wp-publisher-role.php` on the server |
+| Holds | `read`, `edit_posts`, `publish_posts`, `edit_published_posts`, `view_koko_analytics` |
+| Withholds | `manage_categories`, `unfiltered_html`, `upload_files`, `delete_posts`, `delete_published_posts`, `moderate_comments`, `activate_plugins`, everything else |
+
+The role lives in an **mu-plugin** so it cannot be deactivated from WP Admin, and in **this
+repo** so the capability set is a reviewable diff rather than a checkbox someone ticked once.
+The file documents every withheld capability and why — read it before adding one back.
+
+What the reduced role costs, by design:
+
+- **Tags and categories must pre-exist.** See the frontmatter step above.
+- **`wp_report.py` sees approved comments only**, and prints `?` for held, spam and trash rather
+  than a misleading `0`. Reading those needs `moderate_comments`, which also approves and
+  deletes comments; it cannot be granted for reading alone.
+- **The traffic probe cannot read the plugin list** and degrades to the REST namespace check and
+  the page scan. That is sufficient — Koko Analytics registers `koko-analytics/v1`.
+- **No `unfiltered_html`**, so post content cannot carry `<script>`. A credential an agent
+  drives should not be able to put executable JavaScript on the site.
+
 ## Credentials
 
-A netrc-format file at `~/.config/wp-publish/netrc`, mode `0600`, holding a WordPress
-**Application Password** (core WP, revocable per client, HTTPS-only). Outside every repo by
-design — the `.gitignore` is defense in depth; the control is that the secret never sits inside
-a repo at all. The script refuses to read the file if group/other can.
+Two netrc-format files under `~/.config/wp-publish/`, both mode `0600`, each holding a
+WordPress **Application Password** (core WP, revocable per client, HTTPS-only):
 
-**Never `cat`, `Read`, or echo that file.** If auth fails, run `--whoami` and report the error
-text; the fix (rotate the password in WP Admin → Users → Profile → Application Passwords) is
-Peter's.
+| File | Identity | Used for |
+|---|---|---|
+| `netrc` | `wp-publish` / `wp_publisher` | **the default.** Publishing and reporting. |
+| `netrc-admin` | Peter / administrator | plugin and taxonomy work only, passed explicitly |
+
+The least-privileged credential is the default so that reaching for the powerful one is a
+visible act: `WP_NETRC=~/.config/wp-publish/netrc-admin`. Both sit outside every repo by design
+— the `.gitignore` is defense in depth; the control is that the secret never sits inside a repo
+at all. The scripts refuse to read either file if group/other can.
+
+**Never `cat`, `Read`, or echo either file.** If auth fails, run `--whoami` and report the error
+text; the fix (rotate in WP Admin → Users → Profile → Application Passwords) is Peter's.
 
 Overrides for a different site: `WP_SITE=https://…` and `WP_NETRC=/path`.
 

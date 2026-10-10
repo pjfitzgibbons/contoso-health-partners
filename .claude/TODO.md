@@ -80,6 +80,29 @@ something is wrong, then by whether something is blocked on it.
       what remains is moving the infra notes into a versioned file there and removing them from
       the memory store.
 
+## Control-matrix rows waiting for a control matrix
+
+No matrix file exists yet, and the no-speculative-files rule says not to create one for a single
+row. Park them here; move them when the matrix is born.
+
+- [ ] **A WordPress application password cannot be scoped.** It inherits every capability of its
+      user, with no publish-only or read-only variant. The password created on 2026-09-12 to post
+      a blog draft also carried `install_plugins`, `delete_plugins`, `activate_plugins` and
+      `manage_options` — and on 2026-10-10 it is what deleted five plugins and installed Koko
+      Analytics. Mitigated 2026-10-10 by a separate `wp_publisher` role and account; the admin
+      credential moved to `netrc-admin` and is now passed explicitly. The underlying platform
+      weakness is not fixable and belongs in the matrix as an accepted risk with a compensating
+      control.
+- [ ] **Koko Analytics cookieless mode reads the client IP.** `xxh64(daily_seed + user_agent + ip)`
+      with a 16-byte seed rotated daily and session files wiped daily; the IP is never stored.
+      Chosen 2026-10-10 over the cookie method, which never touches the IP but would require a
+      consent banner. Worth a row because it is a real processing-of-personal-data decision taken
+      deliberately, and because Koko's own UI calls the *cookie* method the more privacy-friendly
+      of the two.
+- [ ] **The fingerprint session directory is protected by `.htaccess` only.** Apache-specific; on
+      nginx the deny block does nothing. Filenames are unguessable hashes and the directory ships
+      an empty `index.html`, so exposure is low. Confirm which server is in front of the site.
+
 ## Harness practice
 
 - [ ] **Subagent cost.** 94% of last-24h usage came from subagent-heavy sessions; 66% from
@@ -119,7 +142,18 @@ something is wrong, then by whether something is blocked on it.
       `wp-publish` skill now proves this rather than assuming it. Open question for Peter, and it
       is a privacy decision as much as a measurement one: install a server-side counter that keeps
       no personal data (Koko Analytics, Statify), pull the host's access log by hand, or keep the
-      blog deliberately unmeasured. Nothing installed; nothing to install without a decision.
+      blog deliberately unmeasured. **Resolved 2026-10-10:** Koko Analytics 2.5.3 installed,
+      cookieless (`"method":"fingerprint","use_cookie":false`), optimized endpoint live. W1's
+      number therefore starts from zero on 2026-10-10 and the first nine months are permanently
+      unmeasured — say so when citing it.
+- [ ] **Teach `wp_report.py` to read Koko.** It now reports "an analytics source exists" and stops,
+      which is no longer the most useful answer. Koko registers `koko-analytics/v1` with `/stats`,
+      `/totals`, `/posts`, `/referrers` and `/realtime`, all gated on `view_koko_analytics`, which
+      the `wp_publisher` role holds. Wire `/totals` and `/referrers` for a post id and the traffic
+      section becomes real numbers.
+- [ ] **UpdraftPlus and Wordfence are behind.** 1.26.7 vs 1.26.8, and 9.0.0 vs 9.0.2 as of
+      2026-10-10, after a round of updates that did not pick them up. Wordfence being the stale one
+      is the wrong plugin to be stale.
 - [ ] Notebook idea: how to verify harness resolution rules by script. The method is already
       proven — throwaway trees under `/private/tmp`, a marker instruction, a positive control, and
       `claude -p '/context' < /dev/null` to read back which files loaded.

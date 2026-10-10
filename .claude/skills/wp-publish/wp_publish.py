@@ -21,7 +21,8 @@ The file's YAML frontmatter is the control surface:
     slug:                     # default: filename stem
     excerpt:
     categories: [Name, ...]   # must already exist on the site (structure is Peter's call)
-    tags: [name, ...]         # created if missing
+    tags: [name, ...]         # must already exist too; creating a term needs
+                              # manage_categories, which also deletes terms
     date: 2026-09-12T09:00    # optional, site-local time
     wp_id: 123                # written back here by this script after the first create
 
@@ -107,21 +108,41 @@ def api(method: str, path: str, params: dict | None = None, body: dict | None = 
         die(f"cannot reach {SITE}: {e.reason}")
 
 
-def term_ids(taxonomy: str, names: list[str], create: bool, dry_run: bool) -> list[int | None]:
-    """Resolve term names to ids. Categories must exist; tags are created on demand."""
-    ids: list[int | None] = []
+TERM_LABEL = {"categories": "category", "tags": "tag"}
+
+
+def term_ids(taxonomy: str, names: list[str]) -> list[int]:
+    """Resolve term names to ids. Terms must already exist, in BOTH taxonomies.
+
+    Nothing is created here. Creating a term needs `manage_categories`, and that
+    one capability equally permits renaming and deleting every category and tag
+    on the site -- far too much reach to hold just to spell a new tag. The role
+    in wp-publisher-role.php withholds it, so this function does not ask for it.
+    Taxonomy structure is a human decision in any case, which is why categories
+    already worked this way; tags now match.
+
+    Every missing term is collected before failing, so one run names all of them
+    instead of one per attempt.
+    """
+    label = TERM_LABEL.get(taxonomy, taxonomy)
+    ids: list[int] = []
+    missing: list[str] = []
     for name in names:
         found = api("GET", f"/{taxonomy}", {"search": name, "per_page": 100, "_fields": "id,name"})
         match = next((t for t in found if html.unescape(t["name"]).casefold() == name.casefold()), None)
         if match:
             ids.append(match["id"])
-        elif not create:
-            die(f"{taxonomy[:-3]}y {name!r} does not exist on the site; create it in WP Admin first")
-        elif dry_run:
-            print(f"  would create tag {name!r}")
-            ids.append(None)
         else:
-            ids.append(api("POST", f"/{taxonomy}", body={"name": name})["id"])
+            missing.append(name)
+    if missing:
+        lines = [f"no such {label} on the site: " + ", ".join(repr(m) for m in missing),
+                 "nothing was sent. Create them in WP Admin, or with the admin credential:"]
+        for m in missing:
+            lines.append(
+                f"  curl -sS --netrc-file ~/.config/wp-publish/netrc-admin "
+                f"-X POST {SITE}/wp-json/wp/v2/{taxonomy} "
+                f"-H 'Content-Type: application/json' -d '{json.dumps({'name': m})}'")
+        die("\n".join(lines))
     return ids
 
 
@@ -207,10 +228,10 @@ def main() -> int:
         if post.get(key):
             payload[key] = str(post[key])
     if post.get("categories"):
-        payload["categories"] = term_ids("categories", list(post["categories"]), create=False, dry_run=args.dry_run)
+        payload["categories"] = term_ids("categories", list(post["categories"]))
         print(f"  categories: {dict(zip(post['categories'], payload['categories']))}")
     if post.get("tags"):
-        payload["tags"] = term_ids("tags", list(post["tags"]), create=True, dry_run=args.dry_run)
+        payload["tags"] = term_ids("tags", list(post["tags"]))
         print(f"  tags:       {dict(zip(post['tags'], payload['tags']))}")
     kind = "HTML (--classic)" if args.classic else "Gutenberg blocks"
     print(f"  content: {len(rendered)} bytes of {kind} from {len(body)} bytes of Markdown")
