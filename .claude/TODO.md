@@ -113,7 +113,13 @@ something is wrong, then by whether something is blocked on it.
       is closed-world; and the Linux kernel reached the same rule independently
       (`Documentation/process/coding-assistants.rst`, merged 2025-12-23) while drawing a sharper
       line — AI banned from the certifying field, *required* in a disclosure field.
-- [ ] Check whether W1 has had any traffic.
+- [x] **Check whether W1 has had any traffic — answered 2026-10-10: unmeasured.** Zero comments
+      (approve/hold/spam/trash all 0). Page views do not exist as data: the site runs no analytics
+      plugin and serves no beacon, so WordPress has never counted a view. `wp_report.py` in the
+      `wp-publish` skill now proves this rather than assuming it. Open question for Peter, and it
+      is a privacy decision as much as a measurement one: install a server-side counter that keeps
+      no personal data (Koko Analytics, Statify), pull the host's access log by hand, or keep the
+      blog deliberately unmeasured. Nothing installed; nothing to install without a decision.
 - [ ] Notebook idea: how to verify harness resolution rules by script. The method is already
       proven — throwaway trees under `/private/tmp`, a marker instruction, a positive control, and
       `claude -p '/context' < /dev/null` to read back which files loaded.

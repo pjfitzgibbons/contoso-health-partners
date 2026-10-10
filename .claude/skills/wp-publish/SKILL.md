@@ -1,6 +1,6 @@
 ---
 name: wp-publish
-description: Post or update a blog draft from blog/*.md on the WordPress site peter.fitzgibbons.info via the REST API. Use when Peter asks to post, publish, push, or update a blog post on WordPress, check whether the site credentials work, or preview how a post will render.
+description: Read and write the WordPress site peter.fitzgibbons.info through its REST API. Use this skill for ANY question or request about that blog, including: post, publish, push, update, or unpublish a draft from blog/*.md; preview how a post will render; check the site credentials; and read back how a published post is doing — its comments (including held, spam, and trashed ones), its traffic or page views or analytics, its live URL, or whether anyone has responded to it. Also use it when asked whether a post got any traffic, readers, hits, or engagement, since the answer requires probing what the site actually measures rather than guessing.
 ---
 
 # Publish a blog post to WordPress
@@ -110,6 +110,49 @@ turn. Posting is outward-facing; the keystroke that flips it is his.
 5. Moving `publish` → `draft` (unpublishing) is refused unless `--force` is passed. Say so
    rather than adding the flag.
 
+## Reading back: comments and traffic
+
+`wp_report.py` is the read side. Stdlib only, every request a GET, nothing modified — so
+**run it yourself** rather than handing it over. That is the one place this skill departs from
+"Peter runs the commands": there is nothing here to approve.
+
+```bash
+python3 .claude/skills/wp-publish/wp_report.py blog/POST.md     # wp_id read from frontmatter
+python3 .claude/skills/wp-publish/wp_report.py --id 8282469942
+python3 .claude/skills/wp-publish/wp_report.py --id N --comments   # skip the traffic probe
+python3 .claude/skills/wp-publish/wp_report.py --id N --json
+```
+
+**Comments are real counts.** Queried one status at a time, so the `X-WP-Total` header gives an
+authoritative number per status without paging, and the report includes what a visitor never
+sees: `hold`, `spam`, `trash`. A status that fails to query prints `?`, never `0`.
+
+**Traffic has no source on this site, and the probe exists to prove that rather than assume it.**
+WordPress core stores no view counter — a page view leaves no row in the database. Every "views"
+number anywhere comes from a plugin or a third-party beacon, so the probe checks the three places
+one can be installed: registered REST namespaces, the active plugin list, and the rendered post
+HTML. Observed 2026-10-10: seven namespaces, seven active plugins, 98 KB of page HTML, and
+**zero** analytics markers in any of the three. Active plugins are Add MIME Types, Antispam Bee,
+Aspose Importer & Exporter, Public Post Preview, SyntaxHighlighter Evolved, UpdraftPlus and
+Wordfence. No Jetpack, no stats plugin, no tag manager, no beacon.
+
+So the honest report for any post is **page views unknown** — not zero, and not inferred from
+something else.
+
+- **Never substitute a proxy for a view count.** A comment count, a share count, a backlink, or
+  a recollection of the post doing well is not traffic. If the probe finds nothing, say the
+  number does not exist.
+- The only surviving record is the host's web-server access log, which no API reaches. Getting
+  one requires Peter in the hosting panel.
+- To make traffic measurable in future, the decision is Peter's and it is a privacy decision as
+  much as a measurement one: a server-side counter that keeps no personal data (Koko Analytics,
+  Statify) behaves very differently from a third-party beacon. Neither is installed; do not
+  install one.
+
+When the probe *does* find a source, the script names it and stops. It deliberately does not
+read any analytics API — each one has its own auth, and inventing a client for one on the fly is
+how a made-up number gets published.
+
 ## Credentials
 
 A netrc-format file at `~/.config/wp-publish/netrc`, mode `0600`, holding a WordPress
@@ -128,7 +171,10 @@ Overrides for a different site: `WP_SITE=https://…` and `WP_NETRC=/path`.
 When drafting or editing a post, `.claude/rules/blog-voice.md` loads automatically for
 `blog/**` and describes the inferred house voice. Match it.
 
-## Script
+## Scripts
+
+`wp_report.py` — the read side. Stdlib only, no `uv`, no dependencies: a reporting tool that
+needs nothing resolved always runs. `python3 wp_report.py --help` documents it.
 
 `wp_publish.py` — Python, run under `uv run --script` so its two dependencies
 (`markdown`, `python-frontmatter`) are declared inline and nothing is installed globally.
