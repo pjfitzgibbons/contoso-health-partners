@@ -126,35 +126,45 @@ python3 .claude/skills/wp-publish/wp_report.py --id N --comments   # skip the tr
 python3 .claude/skills/wp-publish/wp_report.py --id N --json
 ```
 
-**Comments are real counts.** Queried one status at a time, so the `X-WP-Total` header gives an
-authoritative number per status without paging, and the report includes what a visitor never
-sees: `hold`, `spam`, `trash`. A status that fails to query prints `?`, never `0`.
+**Comments: approved counts are real; the rest depend on the credential.** Each status is
+queried separately so `X-WP-Total` gives an authoritative number without paging. But the
+non-approved statuses are gated on the **capability**, not on the response, and the reason is a
+measured trap: a credential without `moderate_comments` asking for `status=hold` is **not
+refused** — WordPress returns HTTP 200, an empty array and `X-WP-Total: 0`. It filters silently.
+An empty result is therefore indistinguishable from a real zero, so the script does not query
+those statuses at all without the capability and prints `?`. The default publishing credential
+lacks it, so expect `approve 0, hold ?, spam ?, trash ?` and a total marked `0+`. For the full
+picture, pass the admin credential:
 
-**Traffic has no source on this site, and the probe exists to prove that rather than assume it.**
-WordPress core stores no view counter — a page view leaves no row in the database. Every "views"
-number anywhere comes from a plugin or a third-party beacon, so the probe checks the three places
-one can be installed: registered REST namespaces, the active plugin list, and the rendered post
-HTML. Observed 2026-10-10: seven namespaces, seven active plugins, 98 KB of page HTML, and
-**zero** analytics markers in any of the three. Active plugins are Add MIME Types, Antispam Bee,
-Aspose Importer & Exporter, Public Post Preview, SyntaxHighlighter Evolved, UpdraftPlus and
-Wordfence. No Jetpack, no stats plugin, no tag manager, no beacon.
+```bash
+WP_NETRC=~/.config/wp-publish/netrc-admin \
+  python3 .claude/skills/wp-publish/wp_report.py --id N --comments
+```
 
-So the honest report for any post is **page views unknown** — not zero, and not inferred from
-something else.
+`context=edit` is never requested: it needs `moderate_comments` even for `status=approve`, where
+it returns `403 rest_forbidden_context`. The view context carries `content.rendered`, which is
+all the report needs.
+
+**Traffic comes from Koko Analytics, read live.** The probe still runs first, because *whether*
+a source exists is a question worth answering before reporting a number from one. It checks the
+three places an analytics product can hide — registered REST namespaces, the active plugin list,
+the rendered post HTML — and names what it finds. When it finds `koko-analytics/v1`, the script
+reads `/totals`, `/posts`, `/referrers` and `/stats` and reports per-post and site-wide
+pageviews and visitors, top referrers, and the first day anything was recorded.
+
+**The counting epoch is the thing to be careful about.** Koko went live 2026-10-10 and holds
+nothing from before that, so `KOKO_EPOCH` in the script marks the floor and every report says so
+in as many words: *0 here means "none counted", and for a post published earlier it does not mean
+"none read"*. W1 was published 2026-09-22, so its first nine months are permanently unmeasured.
+Do not quote its number as lifetime traffic.
 
 - **Never substitute a proxy for a view count.** A comment count, a share count, a backlink, or
-  a recollection of the post doing well is not traffic. If the probe finds nothing, say the
-  number does not exist.
-- The only surviving record is the host's web-server access log, which no API reaches. Getting
-  one requires Peter in the hosting panel.
-- To make traffic measurable in future, the decision is Peter's and it is a privacy decision as
-  much as a measurement one: a server-side counter that keeps no personal data (Koko Analytics,
-  Statify) behaves very differently from a third-party beacon. Neither is installed; do not
-  install one.
-
-When the probe *does* find a source, the script names it and stops. It deliberately does not
-read any analytics API — each one has its own auth, and inventing a client for one on the fly is
-how a made-up number gets published.
+  a recollection of the post doing well is not traffic.
+- The traffic probe cannot read the plugin list under the publishing credential, and says so
+  rather than treating a 403 as an absence. The namespace check carries the result regardless.
+- The script reads Koko and nothing else. Another source would get named and left alone: each
+  analytics API has its own auth, and inventing a client for one on the fly is how a made-up
+  number gets published.
 
 ## The publishing identity
 
@@ -190,8 +200,10 @@ stays right and the capability widens. Worth knowing before designing the same t
 What the reduced role costs, measured rather than assumed:
 
 - **`wp_report.py` sees approved comments only**, and prints `?` for held, spam and trash rather
-  than a misleading `0`. Reading those needs `moderate_comments`, which also approves and
-  deletes comments; it cannot be granted for reading alone.
+  than a misleading `0` — which matters more than it sounds, because WordPress answers those
+  queries `200 / X-WP-Total: 0` instead of refusing them. Reading them for real needs
+  `moderate_comments`, which also approves and deletes comments; it cannot be granted for
+  reading alone.
 - **The traffic probe cannot read the plugin list** and degrades to the REST namespace check and
   the page scan. That is sufficient — Koko Analytics registers `koko-analytics/v1`.
 - **Nothing is lost to KSES.** Without `unfiltered_html`, WordPress filters post content, and

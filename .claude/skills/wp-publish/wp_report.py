@@ -32,6 +32,7 @@ always runs. Credentials are the same netrc file wp_publish.py uses.
 
 import argparse
 import base64
+import datetime
 import json
 import netrc
 import os
@@ -47,6 +48,11 @@ SITE = os.environ.get("WP_SITE", "https://peter.fitzgibbons.info").rstrip("/")
 NETRC = Path(os.environ.get("WP_NETRC", "~/.config/wp-publish/netrc")).expanduser()
 
 COMMENT_STATUSES = ("approve", "hold", "spam", "trash")
+
+# Koko Analytics went live on this site 2026-10-10. Queries start a little
+# earlier so the window is obviously inclusive and the "first recorded view"
+# line has room to be meaningful.
+KOKO_EPOCH = "2026-10-01"
 
 # An analytics product betrays itself in at least one of these three ways. Each
 # list is matched case-insensitively as a substring, so a version suffix or a
@@ -165,19 +171,49 @@ def post_facts(post_id: int) -> dict:
 
 # --- comments ---------------------------------------------------------------
 
-def comments(post_id: int) -> dict:
+def identity() -> dict:
+    """Who the credential is, and what it can do. The capability set is what the
+    comment counts below are keyed on -- see the warning there."""
+    me, _ = get("/wp-json/wp/v2/users/me", {"context": "edit"}, fatal=False)
+    if not isinstance(me, dict):
+        return {"slug": "(unknown)", "caps": set()}
+    return {
+        "slug": me.get("slug", "(unknown)"),
+        "id": me.get("id"),
+        "roles": me.get("roles") or [],
+        "caps": {k for k, v in (me.get("capabilities") or {}).items() if v},
+    }
+
+
+def comments(post_id: int, can_moderate: bool) -> dict:
     """Counts per status plus the comments themselves.
 
     Queried one status at a time rather than with status=all: the collection's
     X-WP-Total header then gives an authoritative count per status without
     paging, and a status the site has disabled fails in isolation instead of
     taking the whole report with it.
+
+    The non-approved statuses are gated on the CAPABILITY, not on the response,
+    and that distinction is the whole reason this function takes an argument.
+    Measured 2026-10-10: a credential without `moderate_comments` asking for
+    `status=hold` is not refused -- it gets HTTP 200, an empty array and
+    `X-WP-Total: 0`. WordPress filters silently. So a zero from that query is
+    indistinguishable from "there are none", and reporting it as a count would
+    be stating a fact we do not have. Without the capability the status is not
+    queried at all and the count is None, which prints as '?'.
     """
     out: dict = {"counts": {}, "items": []}
     for status in COMMENT_STATUSES:
+        if status != "approve" and not can_moderate:
+            out["counts"][status] = None  # unknowable with this credential, not zero
+            continue
+        # Deliberately NOT context=edit. The edit context needs moderate_comments
+        # even for already-approved comments -- verified: it returns 403
+        # rest_forbidden_context for status=approve too. The view context returns
+        # content.rendered, which is all this report strips tags from.
         payload, headers = get("/wp-json/wp/v2/comments", {
             "post": post_id, "status": status, "per_page": 100,
-            "context": "edit", "orderby": "date_gmt", "order": "asc",
+            "orderby": "date_gmt", "order": "asc",
         }, fatal=False)
         if payload is None:
             out["counts"][status] = None  # not queryable, not zero
@@ -200,6 +236,43 @@ def comments(post_id: int) -> dict:
 
 
 # --- traffic ----------------------------------------------------------------
+
+def koko_traffic(post_id: int) -> dict:
+    """Read real numbers out of Koko Analytics.
+
+    Gated on `view_koko_analytics`, which the wp_publisher role holds. The window
+    is deliberately wide and stated in the output: Koko holds nothing from before
+    it was installed, so "0 pageviews" from this source means "none counted",
+    and for anything published earlier it does not mean "none read".
+    """
+    today = datetime.date.today().isoformat()
+    window = {"start_date": KOKO_EPOCH, "end_date": today}
+    out: dict = {"window": (KOKO_EPOCH, today)}
+
+    totals, _ = get("/wp-json/koko-analytics/v1/totals", window, fatal=False)
+    out["site"] = ({"visitors": int(totals.get("visitors", 0)),
+                    "pageviews": int(totals.get("pageviews", 0))}
+                   if isinstance(totals, dict) else None)
+
+    posts, _ = get("/wp-json/koko-analytics/v1/posts", window, fatal=False)
+    out["post"] = None
+    if isinstance(posts, list):
+        row = next((p for p in posts if p.get("post_id") == post_id), None)
+        out["post"] = ({"visitors": int(row["visitors"]), "pageviews": int(row["pageviews"])}
+                       if row else {"visitors": 0, "pageviews": 0})
+
+    refs, _ = get("/wp-json/koko-analytics/v1/referrers", window, fatal=False)
+    out["referrers"] = refs[:5] if isinstance(refs, list) else None
+
+    # The first day Koko recorded anything bounds how far back the numbers mean
+    # anything at all.
+    series, _ = get("/wp-json/koko-analytics/v1/stats", window, fatal=False)
+    out["first_recorded"] = None
+    if isinstance(series, list):
+        live = [d["date"] for d in series if int(d.get("pageviews") or 0) > 0]
+        out["first_recorded"] = live[0] if live else None
+    return out
+
 
 def traffic_probe(link: str) -> dict:
     """Look for an analytics source in the three places one can be installed."""
@@ -235,9 +308,15 @@ def traffic_probe(link: str) -> dict:
     return found
 
 
+def read_source(found: dict, post_id: int) -> None:
+    """If the source found is one we can read, read it. Koko is the only one wired."""
+    if any("koko-analytics" in n.lower() for n in found["namespaces"]):
+        found["koko"] = koko_traffic(post_id)
+
+
 # --- output -----------------------------------------------------------------
 
-def report(facts: dict, cmts: dict | None, traffic: dict | None) -> None:
+def report(facts: dict, cmts: dict | None, traffic: dict | None, who: dict) -> None:
     print(f"{facts['title']}")
     print(f"  id {facts['id']}  ·  {facts['status']}  ·  comments {facts['comment_status']}")
     print(f"  posted   {facts['date_gmt']}Z")
@@ -249,7 +328,13 @@ def report(facts: dict, cmts: dict | None, traffic: dict | None) -> None:
         parts = ", ".join(
             f"{k} {'?' if v is None else v}" for k, v in cmts["counts"].items())
         total = cmts["total"]
-        print(f"  total {'unknown' if total is None else total}   ({parts})")
+        print(f"  total {'unknown' if total is None else total}+   ({parts})"
+              if total is not None and any(v is None for v in cmts["counts"].values())
+              else f"  total {'unknown' if total is None else total}   ({parts})")
+        if any(v is None for v in cmts["counts"].values()):
+            print(f"  '?' means this credential ({who['slug']}) lacks moderate_comments, so "
+                  f"those\n  statuses were not queried. WordPress would have answered 0 either "
+                  f"way.")
         if not cmts["items"]:
             print("  none")
         for c in cmts["items"]:
@@ -273,8 +358,33 @@ def report(facts: dict, cmts: dict | None, traffic: dict | None) -> None:
                 print(f"  FOUND    active plugin {p}")
             for b in traffic["beacons"]:
                 print(f"  FOUND    beacon {b}")
-            print("\n  An analytics source exists. This script does not read it — each one has "
-                  "its own\n  API and its own auth. Query the source named above for view counts.")
+
+            k = traffic.get("koko")
+            if k:
+                lo, hi = k["window"]
+                print(f"\n  Koko Analytics, {lo} to {hi}")
+                if k.get("post") is not None:
+                    print(f"    this post    {k['post']['pageviews']:>6} pageviews  "
+                          f"{k['post']['visitors']:>6} visitors")
+                if k.get("site") is not None:
+                    print(f"    whole site   {k['site']['pageviews']:>6} pageviews  "
+                          f"{k['site']['visitors']:>6} visitors")
+                refs = k.get("referrers")
+                if refs:
+                    print("    referrers")
+                    for r in refs:
+                        label = r.get("url") or r.get("label") or "(direct)"
+                        print(f"      {r.get('pageviews', '?'):>5}  {label}")
+                else:
+                    print("    referrers      none recorded")
+                first = k.get("first_recorded")
+                print(f"    first recorded view: {first or 'none yet in this window'}")
+                print("\n    Koko holds nothing from before it was installed, so 0 here means "
+                      "'none\n    counted', and for a post published earlier it does NOT mean "
+                      "'none read'.")
+            else:
+                print("\n  An analytics source exists but this script cannot read it: each one "
+                      "has its\n  own API and its own auth. Query the source named above.")
         else:
             print("\n  No analytics source. WordPress core keeps no view counter, so there is no\n"
                   "  number to report and none is being withheld: page views for this post are\n"
@@ -293,16 +403,20 @@ def main() -> int:
     args = ap.parse_args()
 
     post_id = resolve_id(args)
+    who = identity()
     facts = post_facts(post_id)
     want_comments = not args.traffic
     want_traffic = not args.comments
-    cmts = comments(post_id) if want_comments else None
+    cmts = comments(post_id, "moderate_comments" in who["caps"]) if want_comments else None
     traffic = traffic_probe(facts["link"]) if want_traffic else None
+    if traffic and traffic["instrumented"]:
+        read_source(traffic, post_id)
 
     if args.json:
-        print(json.dumps({"post": facts, "comments": cmts, "traffic": traffic}, indent=2))
+        print(json.dumps({"post": facts, "comments": cmts, "traffic": traffic,
+                          "credential": {**who, "caps": sorted(who["caps"])}}, indent=2))
     else:
-        report(facts, cmts, traffic)
+        report(facts, cmts, traffic, who)
     return 0
 
 

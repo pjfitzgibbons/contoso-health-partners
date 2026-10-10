@@ -93,6 +93,14 @@ row. Park them here; move them when the matrix is born.
       credential moved to `netrc-admin` and is now passed explicitly. The underlying platform
       weakness is not fixable and belongs in the matrix as an accepted risk with a compensating
       control.
+- [ ] 📝 **A refused read can arrive as a successful empty answer.** A WordPress credential without
+      `moderate_comments` querying `/wp/v2/comments?status=hold` gets `200`, `[]` and
+      `X-WP-Total: 0` — not a 403. The filter is silent, so an empty result is indistinguishable
+      from a real zero, and any tool that trusts the response reports "no spam" when it means "no
+      visibility". Measured 2026-10-10 against both credentials. `wp_report.py` now keys those
+      counts on the capability rather than the response. The general rule — *check the permission,
+      not the payload* — is the same shape as the L1 finding that config failures are silent, and
+      belongs in the same family of posts.
 - [ ] 📝 **WordPress uses `post_author` as both the access-control subject and the public byline.**
       So a least-privilege publishing identity and a human byline are in direct conflict: either
       the service account owns the posts and appears as their author, or it does not own them and
@@ -156,11 +164,10 @@ row. Park them here; move them when the matrix is born.
       cookieless (`"method":"fingerprint","use_cookie":false`), optimized endpoint live. W1's
       number therefore starts from zero on 2026-10-10 and the first nine months are permanently
       unmeasured — say so when citing it.
-- [ ] **Teach `wp_report.py` to read Koko.** It now reports "an analytics source exists" and stops,
-      which is no longer the most useful answer. Koko registers `koko-analytics/v1` with `/stats`,
-      `/totals`, `/posts`, `/referrers` and `/realtime`, all gated on `view_koko_analytics`, which
-      the `wp_publisher` role holds. Wire `/totals` and `/referrers` for a post id and the traffic
-      section becomes real numbers.
+- [x] **Teach `wp_report.py` to read Koko — done 2026-10-10.** Reads `/totals`, `/posts`,
+      `/referrers` and `/stats`, all gated on `view_koko_analytics`, which the `wp_publisher` role
+      holds. Reports per-post and site-wide pageviews and visitors, top referrers, and the first
+      recorded day, with `KOKO_EPOCH` marking the floor so a zero is never read as "unread".
 - [ ] **UpdraftPlus and Wordfence are behind.** 1.26.7 vs 1.26.8, and 9.0.0 vs 9.0.2 as of
       2026-10-10, after a round of updates that did not pick them up. Wordfence being the stale one
       is the wrong plugin to be stale.
